@@ -1,16 +1,23 @@
 from flask import Flask, request, jsonify
-import mysql.connector
-from mysql.connector import Error
+from sqlalchemy import create_engine, text
+import pymysql
+pymysql.install_as_MySQLdb()
+from sqlalchemy.orm import sessionmaker
+
 
 app = Flask(__name__)
 
-def connect_to_database():
-    return mysql.connector.connect(
-        host='127.0.0.1',
-        user='root',
-        password='',
-        database='propwiredb'
-    )
+# Database configuration
+db_user = 'dat9admin_test_user'
+db_password = '8P^;O6FT4{O+'
+host = '162.214.68.40'
+db_name = 'dat9admin_my-test-db'
+
+
+engine = create_engine(f'mysql+mysqldb://{db_user}:{db_password}@{host}/{db_name}', pool_recycle=3600)
+
+
+Session = sessionmaker(bind=engine)
 
 @app.route('/', methods=['GET'])
 def home():
@@ -22,35 +29,30 @@ def filter_data():
     if not search_text:
         return jsonify({"error": "search_text parameter is required"}), 400
 
-    connection = None
+    session = Session()
     try:
-        connection = connect_to_database()
-        cursor = connection.cursor()
-
-        sql = """
+        sql = text("""
         SELECT * FROM properties
-        WHERE JSON_UNQUOTE(JSON_EXTRACT(address, '$.zip')) LIKE %s
-        OR JSON_UNQUOTE(JSON_EXTRACT(address, '$.address')) LIKE %s
-        """
-        params = (f"%{search_text}%", f"%{search_text}%")
+        WHERE JSON_UNQUOTE(JSON_EXTRACT(address, '$.zip')) LIKE :search_text
+        OR JSON_UNQUOTE(JSON_EXTRACT(address, '$.address')) LIKE :search_text
+        """)
+        params = {"search_text": f"%{search_text}%"}
 
-        cursor.execute(sql, params)
-        results = cursor.fetchall()
+        result_proxy = session.execute(sql, params)
+        results = result_proxy.fetchall()
 
         if results:
-            columns = [desc[0] for desc in cursor.description]
+            columns = result_proxy.keys()
             results_list = [dict(zip(columns, row)) for row in results]
             return jsonify(results_list)
         else:
             return jsonify({"message": "No matching records found."}), 404
 
-    except Error as e:
+    except Exception as e:
         return jsonify({"error": str(e)}), 500
 
     finally:
-        if connection and connection.is_connected():
-            cursor.close()
-            connection.close()
+        session.close()
 
-# if __name__ == '__main__':
-#     app.run(debug=True)
+if __name__ == '__main__':
+    app.run(debug=True)
