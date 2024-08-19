@@ -12,6 +12,10 @@ def connect_to_database():
         database='propwiredb'
     )
 
+@app.route('/', methods=['GET'])
+def home():
+    return "Welcome! The server is running."
+
 @app.route('/filter', methods=['GET'])
 def filter_data():
     search_text = request.args.get('search_text')
@@ -48,5 +52,5 @@ def filter_data():
             cursor.close()
             connection.close()
 
-if __name__ == '__main__':
-    app.run(debug=True)
+# if __name__ == '__main__':
+#     app.run(debug=True)
